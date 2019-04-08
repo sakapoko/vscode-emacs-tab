@@ -174,11 +174,14 @@ export function activate(context: vscode.ExtensionContext) {
           vscode.window.showInformationMessage('No editor');
           return;
         }
+        if (!editor.selection.isEmpty) {
+          vscode.commands.executeCommand('editor.action.formatSelection', editor);
+          return;
+        }
         const documentLanguageId: string = editor.document.languageId;
         const langConfig = getLanguageConfiguration(documentLanguageId);
         if (!langConfig) {
-          vscode.window.showInformationMessage(
-              `no language config for ${documentLanguageId}`);
+          vscode.window.showInformationMessage(`no language config for ${documentLanguageId}`);
           return;
         }
         const [previousValidLine, currentLine] =
