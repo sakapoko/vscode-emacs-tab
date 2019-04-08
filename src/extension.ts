@@ -201,8 +201,7 @@ export function activate(context: vscode.ExtensionContext) {
         const documentLanguageId: string = editor.document.languageId;
         const langConfig = getLanguageConfiguration(documentLanguageId);
         if (!langConfig) {
-          vscode.window.showInformationMessage(
-              `no language config for ${documentLanguageId}`);
+          vscode.window.showInformationMessage(`no language config for ${documentLanguageId}`);
           return;
         }
         const [previousValidLine, currentLine] =
@@ -302,7 +301,7 @@ function getLanguageConfiguration(id: string): ILanguageConfiguration {
         ext.packageJSON.contributes.languages) {
       const packageLangData = ext.packageJSON.contributes.languages.find(
           (langData) => (langData.id === documentLanguageId));
-      if (packageLangData) {
+      if (packageLangData && packageLangData.configuration) {
         const langConfigFilepath =
             path.join(ext.extensionPath, packageLangData.configuration);
         return mergeLanguageConfiguration(
@@ -414,14 +413,17 @@ function createCloseBracketRegExp(closeBracket: string): RegExp {
 
 function getTabSize(): number {
   // fetch current context tabsize that modified by workspace, editorconfig, ... and so on
-  return vscode.window.activeTextEditor.options.tabSize;
+  return vscode.window.activeTextEditor.options.tabSize == "auto" ?
+    vscode.workspace.getConfiguration('editor').tabSize : vscode.window.activeTextEditor.options.tabSize;
 }
 
 /**
  * @return {boolean} true if hard tab is configured.
  */
 function isUsingHardTab(): boolean {
-  return !vscode.window.activeTextEditor.options.insertSpaces;
+  return vscode.window.activeTextEditor.options.insertSpaces == "auto" ?
+    !vscode.workspace.getConfiguration('editor').insertSpaces :
+    !vscode.window.activeTextEditor.options.tabSize;
 }
 
 /**
@@ -456,8 +458,10 @@ function convertIndentLevelToString(
  * @param onEnterRulesArray
  */
 export function reindentCurrentLine(
-    indentAction: vscode.IndentAction, validPreviousLine: string,
-    currentLine: string): void {
+  indentAction: vscode.IndentAction,
+  validPreviousLine: string,
+  currentLine: string
+): void {
   const tabSize = getTabSize();
   const editor = vscode.window.activeTextEditor;
   const currentPosition = editor.selection.active;
@@ -465,7 +469,7 @@ export function reindentCurrentLine(
 
   const previousIndent = getIndent(validPreviousLine);
   const beforeIndentCurrentIndent =
-      countIndent(getIndent(currentLine), tabSize);
+    countIndent(getIndent(currentLine), tabSize);
   const beforeIndentCurrentIndentNative = getIndent(currentLine).length;
   const currentLineWihtoutLeadingWhitespaces = currentLine.replace(/^\s*/, '');
 
@@ -485,19 +489,21 @@ export function reindentCurrentLine(
   const beforeIndentCursorPositionCharacter = currentPosition.character;
   if (idealIndent !== beforeIndentCurrentIndent) {
     var indentedCurrentLine = indentLine(
-        currentLine, idealIndent, previousIndent,
-        countIndent(previousIndent, tabSize), tabSize);
+      currentLine, idealIndent, previousIndent,
+      countIndent(previousIndent, tabSize), tabSize
+    );
     vscode.window.activeTextEditor.edit((edit) => {
       const startPosition = new vscode.Position(currentPosition.line, 0);
       const endPosition =
-          new vscode.Position(currentPosition.line, currentLine.length);
+      new vscode.Position(currentPosition.line, currentLine.length);
       if (document.eol == 2 && 1 < indentedCurrentLine.length
           && currentLine.length != beforeIndentCurrentIndentNative) {
-        indentedCurrentLine = indentedCurrentLine.substring(0,indentedCurrentLine.length-1);
+        indentedCurrentLine = indentedCurrentLine.substring(0, indentedCurrentLine.length - 1);
       }
       edit.replace(
-          new vscode.Range(startPosition, endPosition), indentedCurrentLine);
-    });
+        new vscode.Range(startPosition, endPosition), indentedCurrentLine);
+      }
+    );
   }
 
   // move cursor if needed
@@ -505,13 +511,15 @@ export function reindentCurrentLine(
     // move to the first character of the line
     const nativeCharacterTabSize = isUsingHardTab() ? 1 : tabSize;
     const nextPosition = new vscode.Position(
-        currentPosition.line, idealIndent * nativeCharacterTabSize);
+      currentPosition.line, idealIndent * nativeCharacterTabSize
+    );
     editor.selection = new vscode.Selection(nextPosition, nextPosition);
   } else if (idealIndent !== beforeIndentCurrentIndent) {
     const cursorMovement = (idealIndent - beforeIndentCurrentIndent) * tabSize;
     const nextPosition = new vscode.Position(
-        currentPosition.line,
-        cursorMovement + beforeIndentCursorPositionCharacter);
+      currentPosition.line,
+      cursorMovement + beforeIndentCursorPositionCharacter
+    );
     editor.selection = new vscode.Selection(nextPosition, nextPosition);
   }
 }
